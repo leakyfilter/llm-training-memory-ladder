@@ -5,6 +5,7 @@ description = "Pure-Python memory estimators for LLM training parallelism strate
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "matplotlib>=3.9",
     "pandas>=2.2",
 ]
 
