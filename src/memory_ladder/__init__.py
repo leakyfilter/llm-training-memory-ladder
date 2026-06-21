@@ -3,6 +3,7 @@
 from memory_ladder.config import MemoryBreakdown, TrainingConfig, TransformerConfig
 from memory_ladder.estimators import DDP, DenseSingleGPU, ZeRO1, ZeRO2, ZeRO3
 from memory_ladder.parameters import total_parameter_count
+from memory_ladder.sweeps import sweep_sequence_lengths, sweep_shapes
 
 __all__ = [
     "DDP",
@@ -13,5 +14,7 @@ __all__ = [
     "ZeRO1",
     "ZeRO2",
     "ZeRO3",
+    "sweep_sequence_lengths",
+    "sweep_shapes",
     "total_parameter_count",
 ]
