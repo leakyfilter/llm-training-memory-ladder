@@ -35,6 +35,7 @@ The project should progressively model:
 - Keep plots publication-quality but minimal.
 - Use seaborn for static plots and plotly for interactive plots.
 - Add or update tests for every formula change.
+- Before every commit, make sure that you are not committing any personal or sensitive info.
 
 ## Commands
 
