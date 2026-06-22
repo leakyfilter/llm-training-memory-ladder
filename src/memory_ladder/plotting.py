@@ -34,10 +34,21 @@ def plot_memory_by_strategy(
     output_path = Path(output_path)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    strategy_names = [breakdown.strategy for breakdown in breakdowns]
+    has_checkpointing_comparison = len(
+        {breakdown.activation_checkpointing for breakdown in breakdowns}
+    ) > 1
+    strategy_names = [
+        (
+            f"{breakdown.strategy}\nckpt {'on' if breakdown.activation_checkpointing else 'off'}"
+            if has_checkpointing_comparison
+            else breakdown.strategy
+        )
+        for breakdown in breakdowns
+    ]
     bottom_gb = [0.0 for _ in breakdowns]
 
-    fig, ax = plt.subplots(figsize=(9, 5.5))
+    figsize = (12, 5.5) if has_checkpointing_comparison else (9, 5.5)
+    fig, ax = plt.subplots(figsize=figsize)
     for bytes_field, label, color in COMPONENTS:
         # Assumption: plotted component heights use decimal GB, matching
         # MemoryBreakdown.to_row() and total_memory_gb.

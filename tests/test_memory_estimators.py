@@ -147,6 +147,36 @@ def test_zero3_gather_buffer_allows_explicit_byte_override():
     assert ZeRO3().estimate(model_config, config).temporary_memory_bytes == 123_456
 
 
+def test_activation_checkpointing_reduces_only_activation_memory():
+    model_config = small_model_config()
+    base_config = training_config()
+    checkpointed_config = training_config(
+        activation_checkpointing=True,
+        activation_checkpointing_reduction_factor=0.25,
+    )
+
+    baseline = DDP().estimate(model_config, base_config)
+    checkpointed = DDP().estimate(model_config, checkpointed_config)
+
+    assert checkpointed.activation_memory_bytes == (
+        baseline.activation_memory_bytes * 0.25
+    )
+    assert checkpointed.parameter_memory_bytes == baseline.parameter_memory_bytes
+    assert checkpointed.gradient_memory_bytes == baseline.gradient_memory_bytes
+    assert checkpointed.optimizer_memory_bytes == baseline.optimizer_memory_bytes
+    assert checkpointed.activation_checkpointing is True
+    assert "recomputes" in checkpointed.recompute_note
+
+
+def test_activation_checkpointing_reduction_factor_is_validated():
+    try:
+        training_config(activation_checkpointing_reduction_factor=0)
+    except ValueError as error:
+        assert "activation_checkpointing_reduction_factor" in str(error)
+    else:
+        raise AssertionError("expected invalid checkpointing factor to raise")
+
+
 def test_increasing_num_layers_increases_total_memory_monotonically():
     config = training_config()
     small = DenseSingleGPU().estimate(small_model_config(num_layers=2), config)

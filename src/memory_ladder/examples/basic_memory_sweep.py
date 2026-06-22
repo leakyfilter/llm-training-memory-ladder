@@ -13,6 +13,7 @@ def build_table() -> pd.DataFrame:
         "strategy",
         "world_size",
         "dp_size",
+        "activation_checkpointing",
         "parameter_memory_gb",
         "gradient_memory_gb",
         "optimizer_memory_gb",
@@ -20,6 +21,7 @@ def build_table() -> pd.DataFrame:
         "temporary_memory_gb",
         "total_memory_gb",
         "key_assumption",
+        "recompute_note",
     ]
     return pd.DataFrame(rows, columns=columns)
 

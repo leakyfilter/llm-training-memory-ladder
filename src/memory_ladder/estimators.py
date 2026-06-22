@@ -47,6 +47,15 @@ def _shard_bytes(byte_count: int, shard_count: int) -> int:
     return ceil(byte_count / shard_count)
 
 
+def _recompute_note(training_config: TrainingConfig) -> str:
+    if training_config.activation_checkpointing:
+        return (
+            "Activation checkpointing enabled: stored activation memory is "
+            "reduced, and backward pass recomputes discarded activations."
+        )
+    return "Activation checkpointing disabled: no activation recomputation modeled."
+
+
 def estimate_activation_memory_bytes(
     model_config: TransformerConfig, training_config: TrainingConfig
 ) -> int:
@@ -64,7 +73,16 @@ def estimate_activation_memory_bytes(
         * model_config.num_layers
         * training_config.activation_multiplier_per_layer
     )
-    return int(activation_elements * training_config.dtype_bytes)
+    activation_memory_bytes = int(activation_elements * training_config.dtype_bytes)
+    if not training_config.activation_checkpointing:
+        return activation_memory_bytes
+
+    # Assumption: checkpointing stores only a configurable fraction of backward
+    # activations and trades that memory reduction for recomputation.
+    return int(
+        activation_memory_bytes
+        * training_config.activation_checkpointing_reduction_factor
+    )
 
 
 def estimate_zero3_gather_buffer_bytes(
@@ -108,6 +126,8 @@ class DenseSingleGPU:
             activation_memory_bytes=activation_bytes,
             temporary_memory_bytes=0,
             key_assumption="Parameters, gradients, and optimizer states are all resident on one GPU.",
+            recompute_note=_recompute_note(single_gpu_config),
+            activation_checkpointing=single_gpu_config.activation_checkpointing,
         )
 
 
@@ -136,6 +156,8 @@ class DDP:
             activation_memory_bytes=activation_bytes,
             temporary_memory_bytes=0,
             key_assumption="DDP replicates parameters, gradients, and optimizer states on every GPU.",
+            recompute_note=_recompute_note(training_config),
+            activation_checkpointing=training_config.activation_checkpointing,
         )
 
 
@@ -166,6 +188,8 @@ class ZeRO1:
             activation_memory_bytes=activation_bytes,
             temporary_memory_bytes=0,
             key_assumption="ZeRO-1 shards optimizer states; parameters and gradients remain replicated.",
+            recompute_note=_recompute_note(training_config),
+            activation_checkpointing=training_config.activation_checkpointing,
         )
 
 
@@ -196,6 +220,8 @@ class ZeRO2:
             activation_memory_bytes=activation_bytes,
             temporary_memory_bytes=0,
             key_assumption="ZeRO-2 shards gradients and optimizer states; parameters remain replicated.",
+            recompute_note=_recompute_note(training_config),
+            activation_checkpointing=training_config.activation_checkpointing,
         )
 
 
@@ -229,4 +255,6 @@ class ZeRO3:
                 model_config, training_config
             ),
             key_assumption="ZeRO-3 shards parameters, gradients, and optimizer states, plus an estimated one-block gather buffer.",
+            recompute_note=_recompute_note(training_config),
+            activation_checkpointing=training_config.activation_checkpointing,
         )

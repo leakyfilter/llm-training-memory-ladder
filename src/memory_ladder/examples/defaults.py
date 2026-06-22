@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from dataclasses import replace
+
 from memory_ladder import DDP, DenseSingleGPU, TrainingConfig, TransformerConfig
 from memory_ladder import ZeRO1, ZeRO2, ZeRO3
 from memory_ladder.config import MemoryBreakdown
@@ -22,8 +24,10 @@ def default_model_config() -> TransformerConfig:
 
 
 def default_training_config() -> TrainingConfig:
+    # Assumption: use a long context in examples so activation memory is large
+    # enough to make checkpointing and ZeRO tradeoffs visible in stacked plots.
     return TrainingConfig(
-        sequence_length=4096,
+        sequence_length=32768,
         microbatch_size=1,
         dp_size=8,
         dtype_bytes=2,
@@ -33,11 +37,29 @@ def default_training_config() -> TrainingConfig:
     )
 
 
-def default_memory_breakdowns() -> list[MemoryBreakdown]:
+def default_strategy_estimators() -> list[DenseSingleGPU | DDP | ZeRO1 | ZeRO2 | ZeRO3]:
+    return [DenseSingleGPU(), DDP(), ZeRO1(), ZeRO2(), ZeRO3()]
+
+
+def default_memory_breakdowns(
+    compare_activation_checkpointing: bool = True,
+) -> list[MemoryBreakdown]:
     model_config = default_model_config()
     training_config = default_training_config()
-    strategies = [DenseSingleGPU(), DDP(), ZeRO1(), ZeRO2(), ZeRO3()]
+    strategies = default_strategy_estimators()
+
+    if not compare_activation_checkpointing:
+        return [
+            strategy.estimate(model_config, training_config)
+            for strategy in strategies
+        ]
+
+    checkpointing_configs = [
+        training_config,
+        replace(training_config, activation_checkpointing=True),
+    ]
     return [
-        strategy.estimate(model_config, training_config)
+        strategy.estimate(model_config, checkpointing_config)
+        for checkpointing_config in checkpointing_configs
         for strategy in strategies
     ]

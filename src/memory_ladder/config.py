@@ -50,6 +50,8 @@ class TrainingConfig:
     grad_bytes: int = 2
     optimizer_state_bytes_per_param: int = 8
     activation_multiplier_per_layer: float = 6.0
+    activation_checkpointing: bool = False
+    activation_checkpointing_reduction_factor: float = 0.5
     zero3_gather_buffer_override_bytes: int | None = None
 
     def __post_init__(self) -> None:
@@ -67,6 +69,10 @@ class TrainingConfig:
             raise ValueError("optimizer_state_bytes_per_param must be non-negative")
         if self.activation_multiplier_per_layer < 0:
             raise ValueError("activation_multiplier_per_layer must be non-negative")
+        if not 0 < self.activation_checkpointing_reduction_factor <= 1:
+            raise ValueError(
+                "activation_checkpointing_reduction_factor must be in (0, 1]"
+            )
         if (
             self.zero3_gather_buffer_override_bytes is not None
             and self.zero3_gather_buffer_override_bytes < 0
@@ -91,6 +97,8 @@ class MemoryBreakdown:
     activation_memory_bytes: int
     temporary_memory_bytes: int
     key_assumption: str
+    recompute_note: str = ""
+    activation_checkpointing: bool = False
     total_memory_bytes: int = field(init=False)
 
     def __post_init__(self) -> None:
@@ -122,13 +130,14 @@ class MemoryBreakdown:
 
         return self.total_memory_bytes / BYTES_PER_GB
 
-    def to_row(self) -> dict[str, int | float | str]:
+    def to_row(self) -> dict[str, int | float | str | bool]:
         """Return a pandas-friendly row with byte and decimal-GB quantities."""
 
         return {
             "strategy": self.strategy,
             "world_size": self.world_size,
             "dp_size": self.dp_size,
+            "activation_checkpointing": self.activation_checkpointing,
             "parameter_memory_bytes": self.parameter_memory_bytes,
             "gradient_memory_bytes": self.gradient_memory_bytes,
             "optimizer_memory_bytes": self.optimizer_memory_bytes,
@@ -142,4 +151,5 @@ class MemoryBreakdown:
             "temporary_memory_gb": self.temporary_memory_bytes / BYTES_PER_GB,
             "total_memory_gb": self.total_memory_gb,
             "key_assumption": self.key_assumption,
+            "recompute_note": self.recompute_note,
         }
